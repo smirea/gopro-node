@@ -6,7 +6,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const _ = require('lodash');
 const axios = require('./lib/axios');
-const { STATUS_URL, cam, GoPro, camSet } = require('./lib/cam');
+const { STATUS_URL, cam, GoPro, camSet, getCamStatus } = require('./lib/cam');
 
 let [ , scriptName, startTime, duration ] = process.argv;
 let endTime;
@@ -14,12 +14,7 @@ let endTime;
 const init = async () => {
     initTime();
 
-    try {
-        if (JSON.parse('' + execSync(`curl -s --connect-timeout 1 ${STATUS_URL}`))) {
-            console.log(' → powering off');
-            await cam.powerOff();
-        }
-    } catch (ex) {}
+    if (await getCamStatus()) await cam.powerOff();
 
     console.log(`Start: ${getTimeFormat(startTime)}`.cyan);
     console.log(`End: ${getTimeFormat(endTime)}`.cyan);
@@ -43,17 +38,7 @@ const init = async () => {
 
     console.log(' → done'.green);
 
-    console.log(' → downloading video');
-    const mediaDir = _.find((await cam.listMedia()).media, { d: '100GOPRO' });
-    if (mediaDir) {
-        const file = _.last(mediaDir.fs).n;
-        const localPath = `downloads/${file}`;
-        execSync('mkdir -p downloads');
-        console.log(`   → copying ${localPath}`)
-        await cam.getMedia('100GOPRO', file, localPath);
-    } else {
-        console.error(' → could not find media dir'.red);
-    }
+    await downloadLastVideo();
 
     console.log(' → powerOff');
     await cam.stop();
@@ -88,6 +73,21 @@ const usage = msg =>
         `${'usage:'.bold} ${path.basename(scriptName)} startTime duration`.yellow,
         ` - time format: hh:mm`.yellow,
     ].join('\n');
+
+const downloadLastVideo = async () => {
+    console.log(' → downloading video');
+    cam.powerOn();
+    const mediaDir = _.find((await cam.listMedia()).media, { d: '100GOPRO' });
+    if (mediaDir) {
+        const file = _.last(mediaDir.fs).n;
+        const localPath = `downloads/${file}`;
+        execSync('mkdir -p downloads');
+        console.log(`   → copying ${localPath}`)
+        await cam.getMedia('100GOPRO', file, localPath);
+    } else {
+        console.error(' → could not find media dir'.red);
+    }
+}
 
 const getTimeFormat = d => {
     const { hF, mF, sF } = getTime(d);
