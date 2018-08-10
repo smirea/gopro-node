@@ -42,6 +42,19 @@ const init = async () => {
     await countdown('Recording timelapse:'.bold, endTime);
 
     console.log(' → done'.green);
+
+    console.log(' → downloading video');
+    const mediaDir = _.find((await cam.listMedia()).media, { d: '100GOPRO' });
+    if (mediaDir) {
+        const file = _.last(mediaDir.fs).n;
+        const localPath = `downloads/${file}`;
+        execSync('mkdir -p downloads');
+        console.log(`   → copying ${localPath}`)
+        await cam.getMedia('100GOPRO', file, localPath);
+    } else {
+        console.error(' → could not find media dir'.red);
+    }
+
     console.log(' → powerOff');
     await cam.stop();
     await cam.powerOff();
